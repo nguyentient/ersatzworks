@@ -25,6 +25,24 @@ that satisfied them.
 - `0.x.y` signals initial development; structure may change between minor
   versions until `1.0.0` declares a stable, relied-upon release.
 
+## Required-field verification
+
+The required-fields reference data (`required_fields.py`) must be verified
+against an authoritative source — never taken from hl7apy alone, which has been
+observed to under-enforce required fields (e.g. PID-5).
+
+For each event type at each HL7 version, verify in this order:
+
+1. **Trigger-event structure first** — confirm which *segments* the event
+   requires (OPT = R) from the authoritative trigger-event definition. This
+   outer layer determines which segment tables apply.
+2. **Segment field tables second** — for each required segment, confirm which
+   *fields* are required (OPT = R) from the authoritative segment definition.
+
+Source: the official HL7 segment/trigger-event attribute tables, cross-referenced
+via Caristix HL7-Definition (https://hl7-definition.caristix.com/v2/). Record the
+event/version scope and verification date in the data file.
+
 ## Development setup
 
 ```powershell
