@@ -18,27 +18,27 @@ yet. See issue #5.
 # PV2, AL1, DG1, etc.) are optional and excluded from this R-only table.
 ADT_A01_2_5_1_REQUIRED = [
     # --- MSH (Message Header) ---
-    {"segment": "MSH", "field": "MSH-1",  "name": "Field Separator"},
-    {"segment": "MSH", "field": "MSH-2",  "name": "Encoding Characters"},
-    {"segment": "MSH", "field": "MSH-7",  "name": "Date/Time Of Message"},
-    {"segment": "MSH", "field": "MSH-9",  "name": "Message Type"},
-    {"segment": "MSH", "field": "MSH-10", "name": "Message Control ID"},
-    {"segment": "MSH", "field": "MSH-11", "name": "Processing ID"},
-    {"segment": "MSH", "field": "MSH-12", "name": "Version ID"},
+    {"segment": "MSH", "field": "MSH-1",  "name": "Field Separator",         "datatype": "ST",  "length": 1},
+    {"segment": "MSH", "field": "MSH-2",  "name": "Encoding Characters",     "datatype": "ST",  "length": 4},
+    {"segment": "MSH", "field": "MSH-7",  "name": "Date/Time Of Message",    "datatype": "TS",  "length": 26},
+    {"segment": "MSH", "field": "MSH-9",  "name": "Message Type",            "datatype": "MSG", "length": 15},
+    {"segment": "MSH", "field": "MSH-10", "name": "Message Control ID",      "datatype": "ST",  "length": 20},
+    {"segment": "MSH", "field": "MSH-11", "name": "Processing ID",           "datatype": "PT",  "length": 3},
+    {"segment": "MSH", "field": "MSH-12", "name": "Version ID",              "datatype": "VID", "length": 60},
 
     # --- EVN (Event Type) ---
     # Note: EVN-1 (Event Type Code) is marked B (backward-compatibility) in
     # v2.5.1, so it is NOT required and is intentionally excluded here.
-    {"segment": "EVN", "field": "EVN-2",  "name": "Recorded Date/Time"},
+    {"segment": "EVN", "field": "EVN-2",  "name": "Recorded Date/Time",      "datatype": "TS",  "length": 26},
 
     # --- PID (Patient Identification) ---
-    {"segment": "PID", "field": "PID-3",  "name": "Patient Identifier List"},
+    {"segment": "PID", "field": "PID-3",  "name": "Patient Identifier List", "datatype": "CX",  "length": 250},
     # PID-5 is marked R in the spec, BUT hl7apy's STRICT validator does NOT
     # enforce it (a message missing PID-5 still passes validation). We list it
     # here because the spec requires it — our table is the authority, not the
     # validator. See issue #5.
-    {"segment": "PID", "field": "PID-5",  "name": "Patient Name"},
+    {"segment": "PID", "field": "PID-5",  "name": "Patient Name",            "datatype": "XPN", "length": 250},
 
     # --- PV1 (Patient Visit) ---
-    {"segment": "PV1", "field": "PV1-2",  "name": "Patient Class"},
+    {"segment": "PV1", "field": "PV1-2",  "name": "Patient Class",           "datatype": "IS",  "length": 1},
 ]
