@@ -15,29 +15,18 @@ from hl7apy.validation import Validator
 
 from required_fields import ADT_A01_2_5_1_REQUIRED
 
+from generators import generate_timestamp, generate_string, generate_cx, generate_xpn
+
 fake = Faker()
 
 HL7_VERSION = "2.5.1"
 
-
-# --- Datatype value generators -------------------------------------------------
-# Each takes no arguments and returns a single string value for its HL7 datatype.
-
-def generate_timestamp() -> str:
-    """TS — HL7 timestamp in YYYYMMDDHHMMSS format (current time)."""
-    return datetime.now().strftime("%Y%m%d%H%M%S")
-
-
-def generate_string() -> str:
-    """ST — a short identifier-style string (used for the message control ID)."""
-    return fake.bothify("MSG#######")
-
-
 # Maps an HL7 datatype to the function that generates a value for it.
-# Extended in later work (e.g. CX, XPN composite types).
 DATATYPE_GENERATORS = {
     "TS": generate_timestamp,
     "ST": generate_string,
+    "CX": generate_cx,
+    "XPN": generate_xpn
 }
 
 
@@ -90,3 +79,4 @@ def build_message() -> Message:
 if __name__ == "__main__":
     msg = build_message()
     Validator.validate(msg)
+    print("\n".join(repr(seg) for seg in msg.to_er7().split("\r")))

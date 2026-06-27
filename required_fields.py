@@ -38,16 +38,13 @@ ADT_A01_2_5_1_REQUIRED = [
     {"segment": "EVN", "field": "EVN-2",  "name": "Recorded Date/Time",      "datatype": "TS",  "length": 26},
 
     # --- PID (Patient Identification) ---
-    # PID-3 is a composite CX type. Proper component-level generation is Piece 2
-    # (issue #9 is Piece 1). Temporary "fixed" placeholder so the message stays
-    # valid until then.
-    {"segment": "PID", "field": "PID-3",  "name": "Patient Identifier List", "datatype": "CX",  "length": 250, "fixed": "12345678"},
-    # PID-5 is a composite XPN type. Marked R in the spec, BUT hl7apy's STRICT
-    # validator does NOT enforce it (a message missing PID-5 still passes). We
-    # list it because the spec requires it — our table is the authority, not the
-    # validator (see issue #5). Proper XPN name generation is Piece 2; temporary
-    # "fixed" placeholder until then.
-    {"segment": "PID", "field": "PID-5",  "name": "Patient Name",            "datatype": "XPN", "length": 250, "fixed": "Smith^John"},
+    # PID-3 (CX, composite) — generated as an alphanumeric ID with a stable
+    # assigning-authority/type tail. See generators.generate_cx.
+    {"segment": "PID", "field": "PID-3",  "name": "Patient Identifier List", "datatype": "CX",  "length": 250},
+    # PID-5 (XPN, composite) — generated as a ragged patient name. Marked R in
+    # the spec, but hl7apy's STRICT validator does NOT enforce it (see issue #5),
+    # so our table remains the authority. See generators.generate_xpn.
+    {"segment": "PID", "field": "PID-5",  "name": "Patient Name",            "datatype": "XPN", "length": 250},
 
     # --- PV1 (Patient Visit) ---
     # PV1-2 is a coded field (HL7 Table 0004). A01 does not pin a single class;
