@@ -45,10 +45,26 @@ event/version scope and verification date in the data file.
 
 ## Development setup
 
+### Windows (PowerShell)
+
 ```powershell
 git clone https://github.com/nguyentient/ersatzworks.git
 cd ersatzworks
 python -m venv .venv
+# Allow the venv activation script to run in this PowerShell session
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+python generator.py
+```
+
+### macOS / Linux
+
+```bash
+git clone https://github.com/nguyentient/ersatzworks.git
+cd ersatzworks
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python generator.py
 ```
