@@ -78,18 +78,7 @@ is ever produced or required.
 - HL7 reserved-delimiter escaping in generated values
 - Additional event types (A03, A08, …) and versions (2.3, 2.7)
 
-## Development setup
-
-```powershell
-git clone https://github.com/nguyentient/ersatzworks.git
-cd ersatzworks
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python generator.py
-```
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
-required-field verification methodology.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, the development
+workflow, and the required-field verification methodology.
