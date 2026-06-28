@@ -72,11 +72,12 @@ is ever produced or required.
 - Required-fields presence check: every message is verified complete against
   the spec table before output, catching gaps hl7apy STRICT does not enforce
   (e.g. an empty PID-5)
+- HL7 reserved-character escaping: reserved characters appearing inside data
+  values are escaped so they cannot corrupt message structure
 
 ## Roadmap
 
 - Cross-field logical consistency (e.g. dates in sensible order)
-- HL7 reserved-delimiter escaping in generated values
 - Additional event types (A03, A08, …) and versions (2.3, 2.7)
 
 ## Contributing
