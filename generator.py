@@ -17,6 +17,8 @@ from required_fields import ADT_A01_2_5_1_REQUIRED
 
 from generators import generate_timestamp, generate_string, generate_cx, generate_xpn
 
+from validation import check_required_fields
+
 fake = Faker()
 
 HL7_VERSION = "2.5.1"
@@ -73,10 +75,14 @@ def build_message() -> Message:
         value = resolve_value(field)
         if value is not None:
             set_field(message, field, value)
+    check_required_fields(message)   # guarantee completeness before returning
     return message
 
 
 if __name__ == "__main__":
     msg = build_message()
     Validator.validate(msg)
+    required_count = len(ADT_A01_2_5_1_REQUIRED)
+    print(f"✓ ADT^A01 (HL7 v2.5.1) — all {required_count} required fields present")
+    print()
     print("\n".join(repr(seg) for seg in msg.to_er7().split("\r")))
