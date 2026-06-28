@@ -21,6 +21,18 @@ CX_ASSIGNING_AUTHORITY = "ERSATZWORKS"
 CX_ID_TYPE = "MR"  # Medical Record number (HL7 Table 0203)
 
 
+def escape_hl7(value: str) -> str:
+    """Escape the HL7 reserved characters hl7apy does NOT handle on assignment.
+
+    hl7apy already escapes |, ~, and \\ and preserves valid escape sequences, so
+    we only handle ^ and & here. Apply to a DATA value BEFORE joining it into a
+    composite, so structural separators (added afterward) stay raw.
+    """
+    value = value.replace("^", "\\S\\")
+    value = value.replace("&", "\\T\\")
+    return value
+
+
 def generate_timestamp() -> str:
     """TS — HL7 timestamp in YYYYMMDDHHMMSS format (current time)."""
     return datetime.now().strftime("%Y%m%d%H%M%S")
@@ -28,7 +40,7 @@ def generate_timestamp() -> str:
 
 def generate_string() -> str:
     """ST — a short identifier-style string (used for the message control ID)."""
-    return fake.bothify("MSG#######")
+    return escape_hl7(fake.bothify("MSG#######"))
 
 
 def generate_cx() -> str:
@@ -36,7 +48,7 @@ def generate_cx() -> str:
 
     e.g. ABC123456^^^ERSATZWORKS^MR
     """
-    patient_id = fake.bothify("???######").upper()
+    patient_id = escape_hl7(fake.bothify("???######").upper())
     return f"{patient_id}^^^{CX_ASSIGNING_AUTHORITY}^{CX_ID_TYPE}"
 
 
@@ -47,15 +59,15 @@ def generate_xpn() -> str:
     Trailing empty components are trimmed; internal gaps preserved (e.g. a
     suffix with no middle -> Family^Given^^Suffix).
     """
-    family = fake.last_name()
-    given = fake.first_name()
+    family = escape_hl7(fake.last_name())
+    given = escape_hl7(fake.first_name())
 
     middle = ""
     if random.random() < 0.60:               # middle present ~60%
         if random.random() < 0.70:           # of those, ~70% a single initial
-            middle = fake.first_name()[0]
+            middle = escape_hl7(fake.first_name()[0])
         else:                                 # ~30% a full middle name
-            middle = fake.first_name()
+            middle = escape_hl7(fake.first_name())
 
     suffix = random.choice(SUFFIXES) if random.random() < 0.08 else ""
 
