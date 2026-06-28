@@ -69,11 +69,12 @@ is ever produced or required.
 - Realistic generation: weighted patient class, ragged patient names,
   alphanumeric patient identifiers, current timestamps
 - Output validated against the HL7 v2.5.1 structure (STRICT)
+- Required-fields presence check: every message is verified complete against
+  the spec table before output, catching gaps hl7apy STRICT does not enforce
+  (e.g. an empty PID-5)
 
 ## Roadmap
 
-- Required-fields presence check (verify generated output against the table,
-  catching gaps the library validator misses)
 - Cross-field logical consistency (e.g. dates in sensible order)
 - HL7 reserved-delimiter escaping in generated values
 - Additional event types (A03, A08, …) and versions (2.3, 2.7)
