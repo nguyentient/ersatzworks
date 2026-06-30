@@ -15,8 +15,8 @@ from faker import Faker
 from hl7apy.core import Message
 from hl7apy.validation import Validator
 
-from generators import generate_timestamp, generate_string, generate_cx, generate_xpn
-from required_fields import get_required_fields, REQUIRED_FIELDS
+from generators import generate_timestamp, generate_string, generate_cx, generate_xpn, generate_visit_timestamps
+from required_fields import get_required_fields, REQUIRED_FIELDS, get_optional_timestamps
 from validation import check_required_fields
 
 fake = Faker()
@@ -65,17 +65,44 @@ def set_field(message: Message, field: dict, value: str) -> None:
     setattr(segment, field_attr, value)
 
 
-def build_message(event: str = "A01", version: str = HL7_VERSION) -> Message:
+def build_message(
+    event: str = "A01",
+    version: str = HL7_VERSION,
+    include_admit: bool = True,
+    include_discharge: bool = True,
+) -> Message:
     """Build a spec-valid ADT message for the given event type and version.
 
     Defaults to ADT^A01 / HL7 v2.5.1 for backward compatibility.
+    include_admit / include_discharge control the optional PV1-44/PV1-45
+    timestamps (present by default; opt out via the CLI --no-admit-time /
+    --no-discharge-time flags). A field is only generated if BOTH the flag
+    requests it AND the event/version actually defines it (e.g. A01 has no
+    discharge concept regardless of include_discharge).
+
     Raises ValueError if no required-fields table exists for the combination.
     """
+    message_time = datetime.now()
     message = Message(f"ADT_{event}", version=version)
+
     for field in get_required_fields(event, version):
         value = resolve_value(field)
         if value is not None:
             set_field(message, field, value)
+
+    optional_defs = get_optional_timestamps(event, version)
+    want_admit = include_admit and "admit" in optional_defs
+    want_discharge = include_discharge and "discharge" in optional_defs
+
+    if want_admit or want_discharge:
+        timestamps = generate_visit_timestamps(
+            include_admit=want_admit,
+            include_discharge=want_discharge,
+            message_time=message_time,
+        )
+        for name, value in timestamps.items():
+            set_field(message, optional_defs[name], value)
+
     check_required_fields(message, event, version)
     return message
 
@@ -99,9 +126,21 @@ if __name__ == "__main__":
         default=HL7_VERSION,
         help=f"HL7 v2 version to use (default: {HL7_VERSION})",
     )
+    parser.add_argument(
+        "--no-admit-time",
+        dest="include_admit",
+        action="store_false",
+        help="Omit the optional admit time (PV1-44); included by default when the event defines it.",
+    )
+    parser.add_argument(
+        "--no-discharge-time",
+        dest="include_discharge",
+        action="store_false",
+        help="Omit the optional discharge time (PV1-45); included by default when the event defines it.",
+    )
     args = parser.parse_args()
 
-    msg = build_message(args.event, args.version)
+    msg = build_message(args.event, args.version, args.include_admit, args.include_discharge)
     Validator.validate(msg)
     required_count = len(get_required_fields(args.event, args.version))
     print(f"✓ ADT^{args.event} (HL7 v{args.version}) — all {required_count} required fields present")

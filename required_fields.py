@@ -99,3 +99,31 @@ def get_required_fields(event: str, version: str) -> list[dict]:
             f"Available: {sorted(REQUIRED_FIELDS)}"
         )
     return REQUIRED_FIELDS[key]
+
+# ---------------------------------------------------------------------------
+# OPTIONAL_TIMESTAMPS — keyed by (event, version) tuple.
+# Each value is a dict mapping a logical name ("admit", "discharge") to its
+# field metadata. Distinct from REQUIRED_FIELDS: these are user-controlled
+# (CLI opt-out flags), not always generated, and some have relationships to
+# each other (discharge depends on admit when both are present — see
+# generators.generate_visit_timestamps).
+# ---------------------------------------------------------------------------
+OPTIONAL_TIMESTAMPS: dict[tuple[str, str], dict[str, dict]] = {
+    ("A01", "2.5.1"): {
+        "admit": {"segment": "PV1", "field": "PV1-44", "name": "Admit Date/Time", "datatype": "TS", "length": 26},
+    },
+    ("A03", "2.5.1"): {
+        "admit":     {"segment": "PV1", "field": "PV1-44", "name": "Admit Date/Time",     "datatype": "TS", "length": 26},
+        "discharge": {"segment": "PV1", "field": "PV1-45", "name": "Discharge Date/Time", "datatype": "TS", "length": 26},
+    },
+}
+
+
+def get_optional_timestamps(event: str, version: str) -> dict[str, dict]:
+    """Return the optional-timestamp field definitions for an event/version.
+
+    Returns an empty dict if the event/version has no optional timestamps
+    defined (rather than raising — absence of optional fields is normal,
+    unlike absence of a required-fields table).
+    """
+    return OPTIONAL_TIMESTAMPS.get((event, version), {})

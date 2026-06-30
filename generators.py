@@ -7,7 +7,7 @@ realistic, varied content. Trailing empty components are trimmed.
 from __future__ import annotations
 
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from faker import Faker
 
@@ -31,6 +31,56 @@ def escape_hl7(value: str) -> str:
     value = value.replace("^", "\\S\\")
     value = value.replace("&", "\\T\\")
     return value
+
+
+def _random_past_datetime(before: datetime, max_days_back: int = 5) -> datetime:
+    """Return a random datetime within max_days_back days before `before`.
+
+    Used to generate realistic-but-bounded past timestamps (e.g. admit time,
+    or a standalone discharge time) without drifting implausibly far back.
+    """
+    seconds_back = random.randint(0, max_days_back * 24 * 60 * 60)
+    return before - timedelta(seconds=seconds_back)
+
+
+def generate_visit_timestamps(
+    include_admit: bool,
+    include_discharge: bool,
+    message_time: datetime,
+) -> dict[str, str]:
+    """Generate admit/discharge timestamps (PV1-44/PV1-45) respecting their
+    real-world relationship.
+
+    - Admit alone: a realistic past timestamp, admit <= message_time.
+    - Discharge alone (no admit): a realistic past timestamp, independent.
+    - Both: discharge = admit + a random duration (2-48 hours), guaranteeing
+      discharge >= admit BY CONSTRUCTION.
+
+    KNOWN SIMPLIFICATION: the admit-discharge duration range is flat and does
+    not vary by patient class (PV1-2). A short outpatient-style visit and a
+    longer inpatient stay currently draw from the same 2-48 hour range. Making
+    duration depend on patient class is a deliberate future refinement, not
+    handled here.
+
+    Returns a dict with "admit" and/or "discharge" keys (HL7 TS strings) for
+    whichever were requested.
+    """
+    result = {}
+    admit_dt = None
+
+    if include_admit:
+        admit_dt = _random_past_datetime(before=message_time, max_days_back=5)
+        result["admit"] = admit_dt.strftime("%Y%m%d%H%M%S")
+
+    if include_discharge:
+        if admit_dt is not None:
+            duration = timedelta(hours=random.randint(2, 48))
+            discharge_dt = admit_dt + duration
+        else:
+            discharge_dt = _random_past_datetime(before=message_time, max_days_back=5)
+        result["discharge"] = discharge_dt.strftime("%Y%m%d%H%M%S")
+
+    return result
 
 
 def generate_timestamp() -> str:
