@@ -7,6 +7,7 @@ generated from its datatype).
 """
 from __future__ import annotations
 
+import argparse
 import random
 from datetime import datetime
 
@@ -15,7 +16,7 @@ from hl7apy.core import Message
 from hl7apy.validation import Validator
 
 from generators import generate_timestamp, generate_string, generate_cx, generate_xpn
-from required_fields import get_required_fields
+from required_fields import get_required_fields, REQUIRED_FIELDS
 from validation import check_required_fields
 
 fake = Faker()
@@ -80,9 +81,29 @@ def build_message(event: str = "A01", version: str = HL7_VERSION) -> Message:
 
 
 if __name__ == "__main__":
-    msg = build_message()
+    valid_events ={event for event, version in REQUIRED_FIELDS}
+    valid_versions = {version for event, version in REQUIRED_FIELDS}
+
+    parser = argparse.ArgumentParser(
+        description="Generate a synthetic, non-PHI HL7 v2 ADT message."
+    )
+    parser.add_argument(
+        "--event",
+        choices=sorted(valid_events),
+        default="A01",
+        help="ADT event type to generate (default: A01)",
+    )
+    parser.add_argument(
+        "--version",
+        choices=sorted(valid_versions),
+        default=HL7_VERSION,
+        help=f"HL7 v2 version to use (default: {HL7_VERSION})",
+    )
+    args = parser.parse_args()
+
+    msg = build_message(args.event, args.version)
     Validator.validate(msg)
-    required_count = len(get_required_fields("A01", HL7_VERSION))
-    print(f"✓ ADT^A01 (HL7 v2.5.1) — all {required_count} required fields present")
+    required_count = len(get_required_fields(args.event, args.version))
+    print(f"✓ ADT^{args.event} (HL7 v{args.version}) — all {required_count} required fields present")
     print()
     print("\n".join(repr(seg) for seg in msg.to_er7().split("\r")))
