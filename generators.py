@@ -33,7 +33,7 @@ def escape_hl7(value: str) -> str:
     return value
 
 
-def _random_past_datetime(before: datetime, max_days_back: int = 5) -> datetime:
+def random_past_datetime(before: datetime, max_days_back: int = 5) -> datetime:
     """Return a random datetime within max_days_back days before `before`.
 
     Used to generate realistic-but-bounded past timestamps (e.g. admit time,
@@ -47,6 +47,7 @@ def generate_visit_timestamps(
     include_admit: bool,
     include_discharge: bool,
     message_time: datetime,
+    admit_time: str | None = None,
 ) -> dict[str, str]:
     """Generate admit/discharge timestamps (PV1-44/PV1-45) respecting their
     real-world relationship.
@@ -55,12 +56,13 @@ def generate_visit_timestamps(
     - Discharge alone (no admit): a realistic past timestamp, independent.
     - Both: discharge = admit + a random duration (2-48 hours), guaranteeing
       discharge >= admit BY CONSTRUCTION.
+    - admit_time provided (sequence mode): skips admit generation and uses
+      the provided value as the anchor for discharge. The record's admit time
+      carries forward from the A01 rather than being regenerated.
 
     KNOWN SIMPLIFICATION: the admit-discharge duration range is flat and does
-    not vary by patient class (PV1-2). A short outpatient-style visit and a
-    longer inpatient stay currently draw from the same 2-48 hour range. Making
-    duration depend on patient class is a deliberate future refinement, not
-    handled here.
+    not vary by patient class (PV1-2). Making duration depend on patient class
+    is a deliberate future refinement, not handled here.
 
     Returns a dict with "admit" and/or "discharge" keys (HL7 TS strings) for
     whichever were requested.
@@ -68,8 +70,12 @@ def generate_visit_timestamps(
     result = {}
     admit_dt = None
 
-    if include_admit:
-        admit_dt = _random_past_datetime(before=message_time, max_days_back=5)
+    if admit_time is not None:
+        from datetime import datetime as dt
+        admit_dt = dt.strptime(admit_time, "%Y%m%d%H%M%S")
+        result["admit"] = admit_time
+    elif include_admit:
+        admit_dt = random_past_datetime(before=message_time, max_days_back=5)
         result["admit"] = admit_dt.strftime("%Y%m%d%H%M%S")
 
     if include_discharge:
@@ -77,7 +83,7 @@ def generate_visit_timestamps(
             duration = timedelta(hours=random.randint(2, 48))
             discharge_dt = admit_dt + duration
         else:
-            discharge_dt = _random_past_datetime(before=message_time, max_days_back=5)
+            discharge_dt = random_past_datetime(before=message_time, max_days_back=5)
         result["discharge"] = discharge_dt.strftime("%Y%m%d%H%M%S")
 
     return result
