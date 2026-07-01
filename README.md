@@ -10,8 +10,9 @@ with fake data — safe to use, version-aware, and generated on demand.
 
 > **Status: proof of concept (`0.x`).** ErsatzWorks currently generates
 > spec-valid `ADT^A01` (Admit) and `ADT^A03` (Discharge) messages for HL7
-> **v2.5.1**. The architecture is deliberately built to extend to additional
-> event types and versions; see [Roadmap](#roadmap).
+> **v2.5.1**, as standalone messages or correlated patient-journey sequences.
+> The architecture is deliberately built to extend to additional event types
+> and versions; see [Roadmap](#roadmap).
 
 ## How it works
 
@@ -31,47 +32,56 @@ documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What it generates
 
-Each run produces a fresh, spec-valid ADT message with realistic, synthetic
-data. The event type is selected via `--event` (default: `A01`):
+ErsatzWorks produces clean, copy-pasteable HL7 messages — ready to drop into
+any integration tool or flat file. Generate a single event or a correlated
+patient-journey sequence:
 
 ```
-python generator.py --event A01
-python generator.py --event A03
-python generator.py --event A03 --no-admit-time
-python generator.py --help
+python generator.py                          # single A01 (default)
+python generator.py --event A03             # single A03
+python generator.py --sequence A01 A03      # correlated journey
+python generator.py --event A01 --no-admit-time   # edge-case testing
+python generator.py --help                  # full usage
 ```
 
-**ADT^A01 — Admit/Visit Notification:**
+**Single message — ADT^A01 (Admit/Visit Notification):**
 
 ```
-MSH|^~\&|||||20260630175534||ADT^A01^ADT_A01|MSG7050095|T|2.5.1
-EVN||20260630175534
-PID|||YXB694803^^^ERSATZWORKS^MR||Kaufman^Christine^D
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260630020357
-
-MSH|^~\&|||||20260630175535||ADT^A01^ADT_A01|MSG2091132|T|2.5.1
-EVN||20260630175535
-PID|||OOT408345^^^ERSATZWORKS^MR||Hunt^Donald^B
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260628155329
+MSH|^~\&|||||20260701153418||ADT^A01^ADT_A01|MSG0808402|T|2.5.1
+EVN||20260701153418
+PID|||UGZ048527^^^ERSATZWORKS^MR||Olsen^Kevin
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260701024942
 ```
 
-**ADT^A03 — Discharge/End Visit:**
+**Single message — ADT^A03 (Discharge/End Visit):**
 
 ```
-MSH|^~\&|||||20260630175535||ADT^A03^ADT_A03|MSG9590704|T|2.5.1
-EVN||20260630175535
-PID|||XQW958272^^^ERSATZWORKS^MR||Allen^Anthony^C
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260625180216|20260627090216
-
-MSH|^~\&|||||20260630175535||ADT^A03^ADT_A03|MSG4701779|T|2.5.1
-EVN||20260630175535
-PID|||BOG793643^^^ERSATZWORKS^MR||George^Sharon^Natasha
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260629111258|20260701101258
+MSH|^~\&|||||20260701153418||ADT^A03^ADT_A03|MSG3533836|T|2.5.1
+EVN||20260701153418
+PID|||YRC325057^^^ERSATZWORKS^MR||Love^Thomas
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260627044611|20260629034611
 ```
 
-In A03 messages, PV1-44 (admit) and PV1-45 (discharge) appear at the end of
-the PV1 segment. Discharge is always generated after admit — the relationship
-is enforced by construction, not by chance.
+**Sequence — complete patient journey (A01 → A03):**
+
+```
+--- Admit (ADT^A01) ---
+MSH|^~\&|||||20260701153418||ADT^A01^ADT_A01|MSG8428078|T|2.5.1
+EVN||20260701153418
+PID|||BTM736255^^^ERSATZWORKS^MR||Coffey^Samantha^M
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260628190150
+
+--- Discharge (ADT^A03) ---
+MSH|^~\&|||||20260701153418||ADT^A03^ADT_A03|MSG2518983|T|2.5.1
+EVN||20260701153418
+PID|||BTM736255^^^ERSATZWORKS^MR||Coffey^Samantha^M
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260628190150|20260629100150
+```
+
+In a sequence, patient identifiers (MRN, name, patient class) and admit time
+are shared across all messages — the A03 discharge time is always generated
+after the A01 admit time, enforced by construction. Each message gets its own
+unique message control ID.
 
 Values vary per run: message control IDs and patient identifiers are unique,
 patient names are realistically "ragged" (most have a middle initial, some a
@@ -86,8 +96,11 @@ them by default; use the flags below to omit them for edge-case testing:
 
 | Flag | Effect |
 |---|---|
-| `--no-admit-time` | Omit PV1-44 (admit time). Applies to A01 and A03. |
-| `--no-discharge-time` | Omit PV1-45 (discharge time). Applies to A03 only. |
+| `--no-admit-time` | Omit PV1-44 (admit time). Applies to A01 and A03. Single message only. |
+| `--no-discharge-time` | Omit PV1-45 (discharge time). Applies to A03 only. Single message only. |
+
+These flags are not valid with `--sequence` — timestamps are structural in a
+sequence and always included.
 
 ## Why "non-PHI"?
 
@@ -104,7 +117,9 @@ is ever produced or required.
   alphanumeric patient identifiers, current timestamps
 - Optional admit/discharge timestamps (PV1-44/45) with cross-field consistency:
   discharge is always generated after admit, enforced by construction
-- CLI event selection: `--event`, `--version`, `--no-admit-time`,
+- Correlated sequence generation (`--sequence A01 A03`): shared patient
+  identifiers and consistent timestamps across a complete patient journey
+- CLI: `--event`, `--version`, `--sequence`, `--no-admit-time`,
   `--no-discharge-time`; run `--help` for full usage
 - Output validated against the HL7 v2.5.1 structure (STRICT)
 - Required-fields presence check: every message is verified complete against
@@ -115,6 +130,7 @@ is ever produced or required.
 
 ## Roadmap
 
+- Mutation sequences (e.g. A01 → A08 demographic update)
 - Cross-field logical consistency for additional fields (e.g. DOB before admit
   time) — partially addressed; further work pending DOB generation
 - Additional event types (A08, A11, …) and versions (2.3, 2.7)
