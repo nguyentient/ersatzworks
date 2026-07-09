@@ -18,8 +18,8 @@ from faker import Faker
 from hl7apy.core import Message
 from hl7apy.validation import Validator
 
-from generators import generate_timestamp, generate_string, generate_cx, generate_xpn, generate_visit_timestamps
-from required_fields import get_required_fields, REQUIRED_FIELDS, get_optional_timestamps
+from generators import generate_timestamp, generate_string, generate_cx, generate_xpn, generate_visit_timestamps, generate_demographics
+from required_fields import get_required_fields, REQUIRED_FIELDS, get_optional_timestamps, get_optional_demographics
 from validation import check_required_fields
 
 fake = Faker()
@@ -73,35 +73,57 @@ def build_message(
     version: str = HL7_VERSION,
     include_admit: bool = True,
     include_discharge: bool = True,
+    include_dob: bool = True,
+    include_gender: bool = True,
     record: PatientRecord | None = None,
 ) -> Message:
     """Build a spec-valid ADT message for the given event type and version.
 
     Defaults to ADT^A01 / HL7 v2.5.1 for backward compatibility.
-    include_admit / include_discharge control the optional PV1-44/PV1-45
-    timestamps (present by default; opt out via the CLI --no-admit-time /
-    --no-discharge-time flags). A field is only generated if BOTH the flag
-    requests it AND the event/version actually defines it.
-
-    record: if provided (sequence mode), stable patient/visit identifiers
-    (PID-3, PID-5, PV1-2, PV1-44) are taken from the record rather than
-    generated fresh. Raises ValueError if no required-fields table exists
-    for the combination.
+    include_admit / include_discharge control optional PV1-44/PV1-45 timestamps.
+    include_dob / include_gender control optional PID-7/PID-8 demographics.
+    A field is only generated if BOTH the flag requests it AND the event/version
+    defines it. record: if provided (sequence mode), stable patient/visit
+    identifiers are taken from the record rather than generated fresh.
+    Raises ValueError if no required-fields table exists for the combination.
     """
     message_time = datetime.now()
     message = Message(f"ADT_{event}", version=version)
 
+    demo_defs = get_optional_demographics(event, version)
+    generated_demographics = {}
+    generated_gender = None
+
     overrides = {}
     if record is not None:
+        # Sequence mode — all stable values come from the record
         overrides["PID-3"] = record.patient_id
         overrides["PID-5"] = record.patient_name
         overrides["PV1-2"] = record.patient_class
+    else:
+        # Single-message mode — generate gender first so name is correlated.
+        # Values are GENERATED here but WRITTEN after the required-fields loop
+        # to preserve correct segment ordering (MSH→EVN→PID→PV1).
+        want_dob = include_dob and "dob" in demo_defs
+        want_gender = include_gender and "gender" in demo_defs
+
+        if want_dob or want_gender:
+            generated_demographics = generate_demographics(
+                include_dob=want_dob,
+                include_gender=want_gender,
+                admit_time=message_time.strftime("%Y%m%d%H%M%S"),
+            )
+            generated_gender = generated_demographics.get("gender")
+
+        # PID-5 override uses gender for a correlated given name
+        overrides["PID-5"] = generate_xpn(gender=generated_gender)
 
     for field in get_required_fields(event, version):
         value = overrides.get(field["field"]) or resolve_value(field)
         if value is not None:
             set_field(message, field, value)
 
+    # --- Optional timestamps (PV1-44/PV1-45) ---
     optional_defs = get_optional_timestamps(event, version)
     want_admit = include_admit and "admit" in optional_defs
     want_discharge = include_discharge and "discharge" in optional_defs
@@ -116,6 +138,19 @@ def build_message(
         )
         for name, value in timestamps.items():
             set_field(message, optional_defs[name], value)
+
+    # --- Optional demographics (PID-7/PID-8) ---
+    # Written here (after required-fields loop) to preserve segment ordering.
+    if record is not None:
+        want_dob = include_dob and "dob" in demo_defs
+        want_gender = include_gender and "gender" in demo_defs
+        if want_dob:
+            set_field(message, demo_defs["dob"], record.dob)
+        if want_gender:
+            set_field(message, demo_defs["gender"], record.gender)
+    else:
+        for name, value in generated_demographics.items():
+            set_field(message, demo_defs[name], value)
 
     check_required_fields(message, event, version)
     return message
@@ -164,14 +199,28 @@ if __name__ == "__main__":
         help="Omit the optional discharge time (PV1-45); included by default "
              "when the event defines it. Not valid with --sequence.",
     )
+    parser.add_argument(
+        "--no-dob",
+        dest="include_dob",
+        action="store_false",
+        help="Omit the optional date of birth (PID-7); included by default "
+             "when the event defines it. Not valid with --sequence.",
+    )
+    parser.add_argument(
+        "--no-gender",
+        dest="include_gender",
+        action="store_false",
+        help="Omit the optional administrative sex (PID-8); included by default "
+             "when the event defines it. Not valid with --sequence.",
+    )
     args = parser.parse_args()
 
-    # Reject --no-admit-time / --no-discharge-time in sequence mode
     if args.sequence is not None:
-        if not args.include_admit or not args.include_discharge:
+        if not args.include_admit or not args.include_discharge or not args.include_dob or not args.include_gender:
             parser.error(
-                "--no-admit-time and --no-discharge-time are not valid in "
-                "sequence mode. Timestamps are always included in a sequence."
+                "--no-admit-time, --no-discharge-time, --no-dob, and --no-gender "
+                "are not valid in sequence mode. These fields are always included "
+                "in a sequence."
             )
 
     if args.sequence is not None:
@@ -187,7 +236,7 @@ if __name__ == "__main__":
             print("\n".join(seg for seg in msg.to_er7().split("\r") if seg))
             print()
     else:
-        msg = build_message(args.event, args.version, args.include_admit, args.include_discharge)
+        msg = build_message(args.event, args.version, args.include_admit, args.include_discharge, args.include_dob, args.include_gender)
         Validator.validate(msg)
         required_count = len(get_required_fields(args.event, args.version))
         print(f"✓ ADT^{args.event} (HL7 v{args.version}) — all {required_count} required fields present")

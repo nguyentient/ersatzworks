@@ -127,3 +127,32 @@ def get_optional_timestamps(event: str, version: str) -> dict[str, dict]:
     unlike absence of a required-fields table).
     """
     return OPTIONAL_TIMESTAMPS.get((event, version), {})
+
+# ---------------------------------------------------------------------------
+# OPTIONAL_DEMOGRAPHICS — keyed by (event, version) tuple.
+# Each value is a dict mapping a logical name ("dob", "gender") to its
+# field metadata. Parallel to OPTIONAL_TIMESTAMPS but distinct — this
+# structure owns demographic optional fields; OPTIONAL_TIMESTAMPS owns
+# temporal fields with relationship logic. Access via
+# get_optional_demographics(event, version).
+# ---------------------------------------------------------------------------
+OPTIONAL_DEMOGRAPHICS: dict[tuple[str, str], dict[str, dict]] = {
+    ("A01", "2.5.1"): {
+        "dob":    {"segment": "PID", "field": "PID-7", "name": "Date/Time of Birth",  "datatype": "TS", "length": 26},
+        "gender": {"segment": "PID", "field": "PID-8", "name": "Administrative Sex",  "datatype": "IS", "length": 1},
+    },
+    ("A03", "2.5.1"): {
+        "dob":    {"segment": "PID", "field": "PID-7", "name": "Date/Time of Birth",  "datatype": "TS", "length": 26},
+        "gender": {"segment": "PID", "field": "PID-8", "name": "Administrative Sex",  "datatype": "IS", "length": 1},
+    },
+}
+
+
+def get_optional_demographics(event: str, version: str) -> dict[str, dict]:
+    """Return the optional-demographic field definitions for an event/version.
+
+    Returns an empty dict if the event/version has no optional demographics
+    defined (rather than raising — absence of optional fields is normal,
+    unlike absence of a required-fields table).
+    """
+    return OPTIONAL_DEMOGRAPHICS.get((event, version), {})

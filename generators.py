@@ -89,6 +89,45 @@ def generate_visit_timestamps(
     return result
 
 
+def generate_demographics(
+    include_dob: bool,
+    include_gender: bool,
+    admit_time: str,
+) -> dict[str, str]:
+    """Generate optional demographic fields (PID-7/PID-8) with correlation.
+
+    Gender is rolled first, then DOB is generated relative to admit_time
+    (guaranteeing DOB < admit by construction). Returns a dict with "dob"
+    and/or "gender" keys for whichever were requested.
+
+    Gender weighting reflects realistic patient population distribution:
+      M (Male)     ~49%
+      F (Female)   ~49%
+      U (Unknown)  ~1.5%
+      O (Other)    ~0.5%
+
+    DOB: a random date 0-90 years before admit_time, formatted YYYYMMDD.
+    """
+    result = {}
+
+    gender_value = None
+    if include_gender:
+        gender_value = random.choices(
+            ["M", "F", "U", "O"],
+            weights=[49, 49, 1.5, 0.5],
+            k=1,
+        )[0]
+        result["gender"] = gender_value
+
+    if include_dob:
+        admit_dt = datetime.strptime(admit_time, "%Y%m%d%H%M%S")
+        days_back = random.randint(0, 90 * 365)
+        dob_dt = admit_dt - timedelta(days=days_back)
+        result["dob"] = dob_dt.strftime("%Y%m%d")
+
+    return result
+
+
 def generate_timestamp() -> str:
     """TS — HL7 timestamp in YYYYMMDDHHMMSS format (current time)."""
     return datetime.now().strftime("%Y%m%d%H%M%S")
@@ -108,15 +147,25 @@ def generate_cx() -> str:
     return f"{patient_id}^^^{CX_ASSIGNING_AUTHORITY}^{CX_ID_TYPE}"
 
 
-def generate_xpn() -> str:
+def generate_xpn(gender: str | None = None) -> str:
     """XPN — patient name with realistic, ragged completeness.
 
     family + given always present; middle ~60% (mostly an initial); suffix ~8%.
     Trailing empty components are trimmed; internal gaps preserved (e.g. a
     suffix with no middle -> Family^Given^^Suffix).
+
+    gender: when provided, selects a gender-appropriate given name (M ->
+    first_name_male, F -> first_name_female, others -> first_name). Default
+    None uses the gender-neutral generator — preserving existing behavior.
     """
     family = escape_hl7(fake.last_name())
-    given = escape_hl7(fake.first_name())
+
+    if gender == "M":
+        given = escape_hl7(fake.first_name_male())
+    elif gender == "F":
+        given = escape_hl7(fake.first_name_female())
+    else:
+        given = escape_hl7(fake.first_name())
 
     middle = ""
     if random.random() < 0.60:               # middle present ~60%
