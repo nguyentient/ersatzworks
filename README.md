@@ -37,70 +37,74 @@ any integration tool or flat file. Generate a single event or a correlated
 patient-journey sequence:
 
 ```
-python generator.py                          # single A01 (default)
-python generator.py --event A03             # single A03
-python generator.py --sequence A01 A03      # correlated journey
-python generator.py --event A01 --no-admit-time   # edge-case testing
-python generator.py --help                  # full usage
+python generator.py                              # single A01 (default)
+python generator.py --event A03                  # single A03
+python generator.py --sequence A01 A03           # correlated journey
+python generator.py --event A01 --no-dob         # edge-case testing
+python generator.py --help                       # full usage
 ```
 
 **Single message — ADT^A01 (Admit/Visit Notification):**
 
 ```
-MSH|^~\&|||||20260701153418||ADT^A01^ADT_A01|MSG0808402|T|2.5.1
-EVN||20260701153418
-PID|||UGZ048527^^^ERSATZWORKS^MR||Olsen^Kevin
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260701024942
+MSH|^~\&|||||20260709080534||ADT^A01^ADT_A01|MSG0694051|T|2.5.1
+EVN||20260709080534
+PID|||LKK104030^^^ERSATZWORKS^MR||Casey^Leah^P^III||19810421|F
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260706090456
 ```
 
 **Single message — ADT^A03 (Discharge/End Visit):**
 
 ```
-MSH|^~\&|||||20260701153418||ADT^A03^ADT_A03|MSG3533836|T|2.5.1
-EVN||20260701153418
-PID|||YRC325057^^^ERSATZWORKS^MR||Love^Thomas
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260627044611|20260629034611
+MSH|^~\&|||||20260709080535||ADT^A03^ADT_A03|MSG0254480|T|2.5.1
+EVN||20260709080535
+PID|||XDY368024^^^ERSATZWORKS^MR||Singleton^Adrian||19380411|M
+PV1||B||||||||||||||||||||||||||||||||||||||||||20260706130430|20260707230430
 ```
 
 **Sequence — complete patient journey (A01 → A03):**
 
 ```
 --- Admit (ADT^A01) ---
-MSH|^~\&|||||20260701153418||ADT^A01^ADT_A01|MSG8428078|T|2.5.1
-EVN||20260701153418
-PID|||BTM736255^^^ERSATZWORKS^MR||Coffey^Samantha^M
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260628190150
+MSH|^~\&|||||20260709080535||ADT^A01^ADT_A01|MSG1872874|T|2.5.1
+EVN||20260709080535
+PID|||JLY786815^^^ERSATZWORKS^MR||Murphy^Douglas^S^II||20250910|M
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260708100532
 
 --- Discharge (ADT^A03) ---
-MSH|^~\&|||||20260701153418||ADT^A03^ADT_A03|MSG2518983|T|2.5.1
-EVN||20260701153418
-PID|||BTM736255^^^ERSATZWORKS^MR||Coffey^Samantha^M
-PV1||I||||||||||||||||||||||||||||||||||||||||||20260628190150|20260629100150
+MSH|^~\&|||||20260709080535||ADT^A03^ADT_A03|MSG0797576|T|2.5.1
+EVN||20260709080535
+PID|||JLY786815^^^ERSATZWORKS^MR||Murphy^Douglas^S^II||20250910|M
+PV1||I||||||||||||||||||||||||||||||||||||||||||20260708100532|20260709040532
 ```
 
-In a sequence, patient identifiers (MRN, name, patient class) and admit time
-are shared across all messages — the A03 discharge time is always generated
-after the A01 admit time, enforced by construction. Each message gets its own
-unique message control ID.
+In a sequence, patient identifiers (MRN, name, patient class), DOB, gender,
+and admit time are shared across all messages — the A03 discharge time is
+always generated after the A01 admit time, enforced by construction. Each
+message gets its own unique message control ID.
+
+In the PID segment, positions 7 and 8 carry DOB (`YYYYMMDD`) and
+Administrative Sex (`M`/`F`/`U`/`O`). Given names are gender-correlated —
+male patients get male names, female patients get female names.
 
 Values vary per run: message control IDs and patient identifiers are unique,
 patient names are realistically "ragged" (most have a middle initial, some a
 full middle name or suffix, many neither), and the patient class is weighted
 toward Inpatient with a realistic share of Emergency and Obstetrics.
 
-## Optional timestamps
+## Optional fields
 
-Admit time (PV1-44) and discharge time (PV1-45) are optional per the HL7 spec
-but present in the vast majority of real-world messages. ErsatzWorks includes
-them by default; use the flags below to omit them for edge-case testing:
+The following fields are optional per the HL7 spec but present in the vast
+majority of real-world messages. ErsatzWorks includes them by default; use
+the flags below to omit them for edge-case testing. All flags are single
+message only — in sequence mode these fields are always included.
 
-| Flag | Effect |
-|---|---|
-| `--no-admit-time` | Omit PV1-44 (admit time). Applies to A01 and A03. Single message only. |
-| `--no-discharge-time` | Omit PV1-45 (discharge time). Applies to A03 only. Single message only. |
-
-These flags are not valid with `--sequence` — timestamps are structural in a
-sequence and always included.
+| Flag | Field | Effect |
+|---|---|---|
+| `--no-admit-time` | PV1-44 | Omit admit time. Applies to A01 and A03. |
+| `--no-discharge-time` | PV1-45 | Omit discharge time. Applies to A03 only. |
+| `--no-dob` | PID-7 | Omit date of birth. Applies to A01 and A03. |
+| `--no-gender` | PID-8 | Omit administrative sex. Applies to A01 and A03. |
 
 ## Why "non-PHI"?
 
@@ -115,12 +119,15 @@ is ever produced or required.
 - All spec-required fields populated and verified against the HL7 spec
 - Realistic generation: weighted patient class, ragged patient names,
   alphanumeric patient identifiers, current timestamps
-- Optional admit/discharge timestamps (PV1-44/45) with cross-field consistency:
-  discharge is always generated after admit, enforced by construction
+- Optional admit/discharge timestamps (PV1-44/45): discharge always generated
+  after admit, enforced by construction
+- Optional demographics (PID-7/8): DOB always generated before admit time
+  (enforced by construction); given names are gender-correlated
 - Correlated sequence generation (`--sequence A01 A03`): shared patient
-  identifiers and consistent timestamps across a complete patient journey
+  identifiers, DOB, gender, and consistent timestamps across a complete
+  patient journey
 - CLI: `--event`, `--version`, `--sequence`, `--no-admit-time`,
-  `--no-discharge-time`; run `--help` for full usage
+  `--no-discharge-time`, `--no-dob`, `--no-gender`; run `--help` for full usage
 - Output validated against the HL7 v2.5.1 structure (STRICT)
 - Required-fields presence check: every message is verified complete against
   the spec table before output, catching gaps hl7apy STRICT does not enforce
@@ -131,8 +138,6 @@ is ever produced or required.
 ## Roadmap
 
 - Mutation sequences (e.g. A01 → A08 demographic update)
-- Cross-field logical consistency for additional fields (e.g. DOB before admit
-  time) — partially addressed; further work pending DOB generation
 - Additional event types (A08, A11, …) and versions (2.3, 2.7)
 
 ## Contributing
