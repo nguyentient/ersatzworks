@@ -12,7 +12,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime
 
-from generators import generate_cx, generate_xpn, random_past_datetime
+from generators import generate_cx, generate_xpn, generate_demographics, random_past_datetime
 from required_fields import get_optional_timestamps
 
 
@@ -29,6 +29,8 @@ class PatientRecord:
     patient_class: str   # PV1-2 — visit classification, stable across events
     admit_time:    str   # PV1-44 — when the patient was admitted; the temporal
                          #           anchor for the whole sequence
+    dob:           str   # PID-7 — date of birth (YYYYMMDD); always before admit
+    gender:        str   # PID-8 — administrative sex (M/F/U/O)
 
 
 # ---------------------------------------------------------------------------
@@ -88,21 +90,33 @@ def generate_sequence(
 def _make_patient_record() -> PatientRecord:
     """Generate a fresh PatientRecord for the start of a new sequence.
 
-    The admit_time is generated here as a realistic past timestamp — it becomes
-    the temporal anchor for the entire sequence. All subsequent messages use
-    this same admit_time rather than generating their own.
+    Generation order enforces all correlations by construction:
+      1. admit_time — the temporal anchor for the whole sequence
+      2. dob + gender — both relative to / correlated with admit_time
+      3. patient_name — uses gender for a gender-appropriate given name
+      4. patient_id, patient_class — independent, generated last
     """
     message_time = datetime.now()
     admit_dt = random_past_datetime(before=message_time, max_days_back=5)
+    admit_time_str = admit_dt.strftime("%Y%m%d%H%M%S")
+
+    demographics = generate_demographics(
+        include_dob=True,
+        include_gender=True,
+        admit_time=admit_time_str,
+    )
+
     return PatientRecord(
         patient_id=generate_cx(),
-        patient_name=generate_xpn(),
+        patient_name=generate_xpn(gender=demographics.get("gender")),
         patient_class=random.choices(
             ["I", "E", "B"],
             weights=[90, 8, 2],
             k=1,
         )[0],
-        admit_time=admit_dt.strftime("%Y%m%d%H%M%S"),
+        admit_time=admit_time_str,
+        dob=demographics["dob"],
+        gender=demographics["gender"],
     )
 
 
@@ -123,5 +137,7 @@ def _build_sequence_message(
         version=version,
         include_admit=True,
         include_discharge=True,
+        include_dob=True,
+        include_gender=True,
         record=record,
     )
